@@ -16,15 +16,31 @@
 package com.jiangdg.demo
 
 import android.content.Context
+import android.util.Log
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.Configuration
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import com.jiangdg.ausbc.base.BaseApplication
 import com.jiangdg.utils.MMKVUtils
+import com.jiangdg.worker.DailyAdSyncWorker
 import com.tencent.bugly.crashreport.CrashReport
+import dagger.hilt.android.HiltAndroidApp
+import java.util.concurrent.TimeUnit
+import javax.inject.Inject
 
 /**
  *
  * @author Created by jiangdg on 2022/2/28
  */
-class DemoApplication: BaseApplication() {
+@HiltAndroidApp
+class DemoApplication: BaseApplication(), Configuration.Provider  {
+
+    @Inject
+    lateinit var workerFactory: HiltWorkerFactory
 
     override fun attachBaseContext(base: Context?) {
         super.attachBaseContext(base)
@@ -35,5 +51,27 @@ class DemoApplication: BaseApplication() {
         // init bugly library
         CrashReport.initCrashReport(this, "9baa0e3fac", true)
         MMKVUtils.init(this)
+
+        val request = PeriodicWorkRequestBuilder<DailyAdSyncWorker>(1, TimeUnit.DAYS)
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED) // needs internet
+                    .build()
+            )
+            .build()
+
+        WorkManager.getInstance(this)
+            .enqueueUniquePeriodicWork(
+                "DailyAdSyncWork",
+                ExistingPeriodicWorkPolicy.KEEP, // don’t replace if already scheduled
+                request
+            )
     }
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setWorkerFactory(workerFactory)
+            .setMinimumLoggingLevel(Log.DEBUG)
+            .build()
+
 }

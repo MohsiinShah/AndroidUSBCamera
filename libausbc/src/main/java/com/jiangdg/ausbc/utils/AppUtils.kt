@@ -54,17 +54,6 @@ object AppUtils {
         ActivityStackUtils.popAllActivity()
     }
 
-    fun getAppName(ctx: Context): String? {
-        val packageManager: PackageManager = ctx.packageManager
-        try {
-            val packageInfo: PackageInfo = packageManager.getPackageInfo(ctx.packageName, 0)
-            val labelRes: Int = packageInfo.applicationInfo.labelRes
-            return ctx.getString(labelRes)
-        } catch (e: PackageManager.NameNotFoundException) {
-            e.printStackTrace()
-        }
-        return null
-    }
 
     /**
      * Determine if the service is running

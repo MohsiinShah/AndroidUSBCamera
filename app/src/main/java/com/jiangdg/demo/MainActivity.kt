@@ -23,13 +23,16 @@ import android.os.Environment
 import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.PermissionChecker
 import androidx.fragment.app.Fragment
+import com.jiangdg.ApiViewModel
 import com.jiangdg.ausbc.utils.ToastUtils
 import com.jiangdg.ausbc.utils.Utils
 import com.jiangdg.demo.databinding.ActivityMainBinding
+import dagger.hilt.android.AndroidEntryPoint
 import kotlin.system.exitProcess
 
 /**
@@ -37,17 +40,24 @@ import kotlin.system.exitProcess
  *
  * @author Created by jiangdg on 2021/12/27
  */
+@AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
     private var mWakeLock: PowerManager.WakeLock? = null
     private lateinit var viewBinding: ActivityMainBinding
+
+    private val viewModel: ApiViewModel by viewModels()
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         viewBinding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(viewBinding.root)
-//        replaceDemoFragment(DemoMultiCameraFragment())
         replaceDemoFragment(DemoFragment())
-//        replaceDemoFragment(GlSurfaceFragment())
+
+//        viewModel.data.observe(this){
+//            Log.d("TAG", "onCreate: $it")
+//        }
+//        viewModel.fetchData()
     }
 
     override fun onStart() {

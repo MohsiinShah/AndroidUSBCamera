@@ -29,6 +29,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
@@ -37,17 +38,18 @@ import android.widget.PopupWindow
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.ContextCompat
 import androidx.core.view.children
 import androidx.core.widget.TextViewCompat
 import androidx.lifecycle.lifecycleScope
 import com.afollestad.materialdialogs.MaterialDialog
 import com.afollestad.materialdialogs.list.listItemsSingleChoice
+import com.bumptech.glide.Glide
 import com.jiangdg.ausbc.MultiCameraClient
 import com.jiangdg.ausbc.base.BaseBottomDialog
 import com.jiangdg.ausbc.base.CameraFragment
 import com.jiangdg.ausbc.callback.ICameraStateCallBack
-import com.jiangdg.demo.databinding.FragmentDemoBinding
 import com.jiangdg.ausbc.callback.ICaptureCallBack
 import com.jiangdg.ausbc.callback.IPlayCallBack
 import com.jiangdg.ausbc.camera.CameraUVC
@@ -58,21 +60,39 @@ import com.jiangdg.ausbc.render.effect.bean.CameraEffect
 import com.jiangdg.ausbc.utils.*
 import com.jiangdg.ausbc.utils.bus.BusKey
 import com.jiangdg.ausbc.utils.bus.EventBus
-import com.jiangdg.utils.imageloader.ILoader
-import com.jiangdg.utils.imageloader.ImageLoaders
 import com.jiangdg.ausbc.widget.*
+import com.jiangdg.db.AppDatabase
+import com.jiangdg.db.slotDateTime
+import com.jiangdg.db.toModel
 import com.jiangdg.demo.EffectListDialog.Companion.KEY_ANIMATION
 import com.jiangdg.demo.EffectListDialog.Companion.KEY_FILTER
 import com.jiangdg.demo.databinding.DialogMoreBinding
+import com.jiangdg.demo.databinding.FragmentDemoBinding
+import com.jiangdg.models.Ad
 import com.jiangdg.utils.MMKVUtils
+import com.jiangdg.utils.imageloader.ILoader
+import com.jiangdg.utils.imageloader.ImageLoaders
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.time.Duration
+import java.time.ZonedDateTime
 import java.util.*
+import javax.inject.Inject
 
 /** CameraFragment Usage Demo
  *
  * @author Created by jiangdg on 2022/1/28
+ *
+ *
  */
+
+
+@AndroidEntryPoint
 class DemoFragment : CameraFragment(), View.OnClickListener, CaptureMediaView.OnViewClickListener {
     private var mMultiCameraDialog: MultiCameraDialog? = null
     private lateinit var mMoreBindingView: DialogMoreBinding
@@ -83,6 +103,11 @@ class DemoFragment : CameraFragment(), View.OnClickListener, CaptureMediaView.On
     private var mRecSeconds = 0
     private var mRecMinute = 0
     private var mRecHours = 0
+
+    private var adJob: Job? = null
+
+    @Inject
+    lateinit var appDatabase: AppDatabase
 
     private val mCameraModeTabMap = mapOf(
         CaptureMediaView.CaptureMode.MODE_CAPTURE_PIC to R.id.takePictureModeTv,
@@ -162,6 +187,151 @@ class DemoFragment : CameraFragment(), View.OnClickListener, CaptureMediaView.On
         mViewBinding.captureBtn.setOnViewClickListener(this)
         mViewBinding.albumPreviewIv.setTheme(PreviewImageView.Theme.DARK)
         switchLayoutClick()
+
+       startAdScheduler()
+
+
+//        Glide.with(this).load("https://dummyimage.com/120x600/ff7f7f/333333.png&text=Left+Ad")
+//            .into(mViewBinding.adLeft)
+//
+//        Glide.with(this).load("https://dummyimage.com/728x90/7fbfff/333333.png&text=Bottom+Ad")
+//            .into(mViewBinding.adBottom)
+//
+//
+//        mViewBinding.adBottom.visibility = View.VISIBLE
+//        mViewBinding.adLeft.visibility = View.VISIBLE
+
+     //   setupFullScreenAd()
+    }
+
+    private fun startAdScheduler() {
+        adJob = lifecycleScope.launch(Dispatchers.IO) {
+            appDatabase.adDao().observeAllAds().collect { ads ->
+                if (ads.isEmpty()) return@collect
+
+                while (isActive) {
+                    val now = ZonedDateTime.now()
+
+                    // ⏱ Round up to next 5-minute slot
+                    val nextSlot = now.withSecond(0).withNano(0)
+                        .plusMinutes((5 - now.minute % 5).toLong())
+
+
+                    Log.d(TAG, "next slot: $nextSlot")
+//                    val adForSlot = ads.firstOrNull { it.slotDateTime() == nextSlot }
+                    val adForSlot = ads.firstOrNull { ad ->
+                        val slot = ad.slotDateTime()
+                        slot.withSecond(0).withNano(0) == nextSlot.withSecond(0).withNano(0)
+                    }
+
+
+                    Log.d(TAG, "ad for slot: $adForSlot")
+
+                    if (adForSlot != null) {
+                        Log.d(TAG, "ad for slot: not null")
+
+                        val delayMs = Duration.between(now, nextSlot).toMillis()
+                        if (delayMs > 0) delay(delayMs)
+
+                        Log.d(TAG, "ad for slot: $delayMs")
+
+                        withContext(Dispatchers.Main) {
+                            showLBanner(adForSlot.toModel())
+                        }
+
+                        // ✅ Mark as displayed in DB
+                        adForSlot.isDisplayed = true
+                        appDatabase.adDao().update(adForSlot)
+
+                        // ⏱ Keep banners for 10s, then hide
+                        delay(10_000)
+                        withContext(Dispatchers.Main) { hideLBanner() }
+                    } else {
+                        // no ad for this slot → wait until next slot
+                        val delayMs = Duration.between(now, nextSlot).toMillis()
+                        if (delayMs > 0) delay(delayMs)
+                    }
+                }
+            }
+        }
+    }
+
+
+    private fun hideLBanner() {
+        // Hide banners
+        mViewBinding.adLeft.visibility = View.GONE
+        mViewBinding.adBottom.visibility = View.GONE
+
+        // Restore camera preview to full size
+        val params = mViewBinding.cameraViewContainer.layoutParams as ConstraintLayout.LayoutParams
+        params.matchConstraintPercentWidth = 1f
+        params.matchConstraintPercentHeight = 1f
+        mViewBinding.cameraViewContainer.layoutParams = params
+        mViewBinding.cameraViewContainer.requestLayout()
+    }
+
+    private fun showLBanner(ad: Ad) {
+
+        Log.d(TAG, "ad visible")
+
+        mViewBinding.apply {
+            adFullscreen.visibility = View.GONE
+            adLeft.visibility = View.VISIBLE
+            adBottom.visibility = View.VISIBLE
+
+            Glide.with(requireContext()).load(ad.urlLeft).into(adLeft)
+            Glide.with(requireContext()).load(ad.urlBottom).into(adBottom)
+
+            // auto-hide after 10s unless fullscreen triggered
+            Handler(Looper.getMainLooper()).postDelayed({
+                adLeft.visibility = View.GONE
+                adBottom.visibility = View.GONE
+                Log.d(TAG, " ad hidden")
+
+            }, ad.lbannerSeconds?.times(1000L) ?: 0)
+        }
+    }
+
+
+    private fun showFullscreenAd(ad: Ad) {
+        mViewBinding.apply {
+            adLeft.visibility = View.GONE
+            adBottom.visibility = View.GONE
+            adFullscreen.visibility = View.VISIBLE
+
+            Glide.with(requireContext()).load(ad.urlFullscreen).into(adFullscreen)
+
+            // shrink camera into PiP (bottom-right)
+            val params = cameraViewContainer.layoutParams as ConstraintLayout.LayoutParams
+            params.matchConstraintPercentWidth = 0.2f
+            params.matchConstraintPercentHeight = 0.2f
+            params.endToEnd = ConstraintLayout.LayoutParams.PARENT_ID
+            params.bottomToBottom = ConstraintLayout.LayoutParams.PARENT_ID
+            cameraViewContainer.layoutParams = params
+
+            // TODO: inflate QRView, load QR code (ZXing/other lib), align left-center
+
+            Handler(Looper.getMainLooper()).postDelayed({
+                adFullscreen.visibility = View.GONE
+                restoreCameraLayout()
+            }, ad.fullscreenSeconds?.times(1000L) ?: 0)
+        }
+    }
+
+    private fun restoreCameraLayout() {
+        val params = mViewBinding.cameraViewContainer.layoutParams as ConstraintLayout.LayoutParams
+        params.matchConstraintPercentWidth = 1f
+        params.matchConstraintPercentHeight = 1f
+        params.topToTop = ConstraintLayout.LayoutParams.PARENT_ID
+        params.bottomToBottom = ConstraintLayout.LayoutParams.PARENT_ID
+        params.startToStart = ConstraintLayout.LayoutParams.PARENT_ID
+        params.endToEnd = ConstraintLayout.LayoutParams.PARENT_ID
+        mViewBinding.cameraViewContainer.layoutParams = params
+    }
+
+
+    private fun isNetworkAvailable(): Boolean {
+        return true
     }
 
     override fun initData() {
