@@ -21,7 +21,9 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.jiangdg.ausbc.base.BaseApplication
@@ -52,7 +54,7 @@ class DemoApplication: BaseApplication(), Configuration.Provider  {
         CrashReport.initCrashReport(this, "9baa0e3fac", true)
         MMKVUtils.init(this)
 
-        val request = PeriodicWorkRequestBuilder<DailyAdSyncWorker>(1, TimeUnit.DAYS)
+        val request = OneTimeWorkRequestBuilder<DailyAdSyncWorker>()
             .setConstraints(
                 Constraints.Builder()
                     .setRequiredNetworkType(NetworkType.CONNECTED) // needs internet
@@ -61,9 +63,9 @@ class DemoApplication: BaseApplication(), Configuration.Provider  {
             .build()
 
         WorkManager.getInstance(this)
-            .enqueueUniquePeriodicWork(
+            .enqueueUniqueWork(
                 "DailyAdSyncWork",
-                ExistingPeriodicWorkPolicy.KEEP, // don’t replace if already scheduled
+                ExistingWorkPolicy.KEEP, // don’t replace if already enqueued
                 request
             )
     }

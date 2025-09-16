@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface AdDao {
 
+    @Query("SELECT * FROM ads")
+    suspend fun getAllAds(): List<AdEntity>
     @Query("SELECT * FROM ads ORDER BY slotTime ASC")
     fun observeAllAds(): Flow<List<AdEntity>>
 

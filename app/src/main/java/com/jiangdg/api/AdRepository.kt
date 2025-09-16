@@ -32,8 +32,7 @@ class AdRepository @Inject constructor(
             val newSlot = baseSlot.plusMinutes((index * 5).toLong())
 
             ad.copy(
-                slotTime = newSlot.toString(),
-
+           //     slotTime = newSlot.toString(),
                 // Remove any trailing digits after .png
                 urlLeft = ad.urlLeft?.replace(Regex("(\\.png)\\d*$"), "$1"),
                 urlBottom = ad.urlBottom?.replace(Regex("(\\.png)\\d*$"), "$1"),
@@ -44,6 +43,7 @@ class AdRepository @Inject constructor(
         // Clear old ads and insert updated ones
         dao.clearAll()
         dao.insertAll(updatedAds.map { it.toEntity() })
+      //  dao.insertAll(ads = ads.map { it.toEntity() })
     }
 
 
