@@ -52,12 +52,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         viewBinding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(viewBinding.root)
-        replaceDemoFragment(DemoFragment())
-
-//        viewModel.data.observe(this){
-//            Log.d("TAG", "onCreate: $it")
-//        }
-//        viewModel.fetchData()
+        checkPermissionsAndMove()
     }
 
     override fun onStart() {
@@ -72,74 +67,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-/*
-    private fun replaceDemoFragment(fragment: Fragment) {
-        Log.d("TAG", "replaceDemoFragment: here")
-        val hasCameraPermission = PermissionChecker.checkSelfPermission(this, CAMERA)
-        val hasStoragePermission =
-            PermissionChecker.checkSelfPermission(this, WRITE_EXTERNAL_STORAGE)
-        val hasStorageReadPermission = PermissionChecker.checkSelfPermission(this, READ_EXTERNAL_STORAGE)
 
-        if (hasCameraPermission != PermissionChecker.PERMISSION_GRANTED || hasStoragePermission != PermissionChecker.PERMISSION_GRANTED
-            || hasStorageReadPermission != PermissionChecker.PERMISSION_GRANTED
-        ) {
-            if (ActivityCompat.shouldShowRequestPermissionRationale(this, CAMERA)) {
-                ToastUtils.show(R.string.permission_tip)
-            }
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf(CAMERA, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE, RECORD_AUDIO),
-                REQUEST_CAMERA
-            )
-            Log.d("TAG", "replaceDemoFragment: return")
-
-            return
-        }
-        val transaction = supportFragmentManager.beginTransaction()
-        transaction.replace(R.id.fragment_container, fragment)
-        transaction.commitAllowingStateLoss()
-        Log.d("TAG", "replaceDemoFragment: done")
-
-    }
-*/
-
-
-/*    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        when (requestCode) {
-            REQUEST_CAMERA -> {
-                val hasCameraPermission = PermissionChecker.checkSelfPermission(this, CAMERA)
-                if (hasCameraPermission == PermissionChecker.PERMISSION_DENIED) {
-                    ToastUtils.show(R.string.permission_tip)
-                    return
-                }
-//                replaceDemoFragment(DemoMultiCameraFragment())
-                replaceDemoFragment(DemoFragment())
-//                replaceDemoFragment(GlSurfaceFragment())
-            }
-            REQUEST_STORAGE -> {
-                val hasCameraPermission =
-                    PermissionChecker.checkSelfPermission(this, WRITE_EXTERNAL_STORAGE)
-                if (hasCameraPermission == PermissionChecker.PERMISSION_DENIED) {
-                    ToastUtils.show(R.string.permission_tip)
-                    return
-                }
-                // todo
-            }
-            else -> {
-            }
-        }
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-    }*/
-
-    private fun replaceDemoFragment(fragment: Fragment) {
+    private fun checkPermissionsAndMove() {
         Log.d("TAG", "replaceDemoFragment: here")
         val hasCameraPermission = PermissionChecker.checkSelfPermission(this, CAMERA) == PermissionChecker.PERMISSION_GRANTED
         val hasAudioPermission = PermissionChecker.checkSelfPermission(this, RECORD_AUDIO) == PermissionChecker.PERMISSION_GRANTED
@@ -170,13 +99,18 @@ class MainActivity : AppCompatActivity() {
             ActivityCompat.requestPermissions(this, permissions, REQUEST_CAMERA)
             Log.d("TAG", "replaceDemoFragment: permissions not granted, requesting")
             return
+        }else{
+            goToPreview()
         }
+    }
 
+    fun goToPreview(){
         val transaction = supportFragmentManager.beginTransaction()
-        transaction.replace(R.id.fragment_container, fragment)
+        transaction.replace(R.id.fragment_container, DemoFragment())
         transaction.commitAllowingStateLoss()
         Log.d("TAG", "replaceDemoFragment: done")
     }
+
 
     override fun onRequestPermissionsResult(
         requestCode: Int,
@@ -206,8 +140,9 @@ class MainActivity : AppCompatActivity() {
               //  replaceDemoFragment(DemoFragment())
 //                finishAffinity()
                 try {
-                    finishAndRemoveTask()
-                    exitProcess(0)
+//                    finishAndRemoveTask()
+//                    exitProcess(0)
+                    goToPreview()
                 }catch (e: Exception){
                     e.printStackTrace()
                 }

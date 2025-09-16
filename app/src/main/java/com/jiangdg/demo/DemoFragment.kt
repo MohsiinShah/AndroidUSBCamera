@@ -114,6 +114,7 @@ class DemoFragment : CameraFragment(), View.OnClickListener, CaptureMediaView.On
         CaptureMediaView.CaptureMode.MODE_CAPTURE_AUDIO to R.id.recordAudioModeTv
     )
 
+
     private val mEffectDataList by lazy {
         arrayListOf(
             CameraEffect.NONE_FILTER,
