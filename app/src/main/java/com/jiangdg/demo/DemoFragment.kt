@@ -265,6 +265,33 @@ class DemoFragment : CameraFragment(), View.OnClickListener, CaptureMediaView.On
             qrCodeView.visibility = View.GONE
             adLeft.visibility = View.VISIBLE
             adBottom.visibility = View.VISIBLE
+
+            // Initialize ads with zero alpha and offset
+            adLeft.alpha = 0f
+            adLeft.translationX = -adLeft.width.toFloat()
+            adBottom.alpha = 0f
+            adBottom.translationY = adBottom.height.toFloat()
+
+            // Create animation for adLeft (fade in and slide from left)
+            val leftFadeIn = ObjectAnimator.ofFloat(adLeft, "alpha", 0f, 1f)
+            val leftSlideIn = ObjectAnimator.ofFloat(adLeft, "translationX", -adLeft.width.toFloat(), 0f)
+            val leftAnimatorSet = AnimatorSet().apply {
+                playTogether(leftFadeIn, leftSlideIn)
+                duration = 500
+            }
+
+            // Create animation for adBottom (fade in and slide from bottom)
+            val bottomFadeIn = ObjectAnimator.ofFloat(adBottom, "alpha", 0f, 1f)
+            val bottomSlideIn = ObjectAnimator.ofFloat(adBottom, "translationY", adBottom.height.toFloat(), 0f)
+            val bottomAnimatorSet = AnimatorSet().apply {
+                playTogether(bottomFadeIn, bottomSlideIn)
+                duration = 500
+            }
+
+            // Start animations
+            leftAnimatorSet.start()
+            bottomAnimatorSet.start()
+
             Glide.with(requireContext()).load(ad.urlLeft).into(adLeft)
             Glide.with(requireContext()).load(ad.urlBottom).into(adBottom)
         }
@@ -273,11 +300,59 @@ class DemoFragment : CameraFragment(), View.OnClickListener, CaptureMediaView.On
     private fun hideLBanner() {
         Log.d(TAG, "Hiding L-banner")
         mViewBinding.apply {
-            adLeft.visibility = View.GONE
-            adBottom.visibility = View.GONE
+            // Create animation for adLeft (fade out and slide to left)
+            val leftFadeOut = ObjectAnimator.ofFloat(adLeft, "alpha", 1f, 0f)
+            val leftSlideOut = ObjectAnimator.ofFloat(adLeft, "translationX", 0f, -adLeft.width.toFloat())
+            val leftAnimatorSet = AnimatorSet().apply {
+                playTogether(leftFadeOut, leftSlideOut)
+                duration = 500
+                addListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        adLeft.visibility = View.GONE
+                    }
+                })
+            }
 
+            // Create animation for adBottom (fade out and slide to bottom)
+            val bottomFadeOut = ObjectAnimator.ofFloat(adBottom, "alpha", 1f, 0f)
+            val bottomSlideOut = ObjectAnimator.ofFloat(adBottom, "translationY", 0f, adBottom.height.toFloat())
+            val bottomAnimatorSet = AnimatorSet().apply {
+                playTogether(bottomFadeOut, bottomSlideOut)
+                duration = 500
+                addListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        adBottom.visibility = View.GONE
+                    }
+                })
+            }
+
+            // Start animations
+            leftAnimatorSet.start()
+            bottomAnimatorSet.start()
         }
     }
+
+
+    //    private fun showLBanner(ad: Ad) {
+//        Log.d(TAG, "Showing L-banner")
+//        mViewBinding.apply {
+//            adFullscreen.visibility = View.GONE
+//            qrCodeView.visibility = View.GONE
+//            adLeft.visibility = View.VISIBLE
+//            adBottom.visibility = View.VISIBLE
+//            Glide.with(requireContext()).load(ad.urlLeft).into(adLeft)
+//            Glide.with(requireContext()).load(ad.urlBottom).into(adBottom)
+//        }
+//    }
+//
+//    private fun hideLBanner() {
+//        Log.d(TAG, "Hiding L-banner")
+//        mViewBinding.apply {
+//            adLeft.visibility = View.GONE
+//            adBottom.visibility = View.GONE
+//
+//        }
+//    }
     private fun showFullscreenAd(ad: Ad) {
         Log.d(TAG, "Showing full-screen ad")
         mViewBinding.apply {
