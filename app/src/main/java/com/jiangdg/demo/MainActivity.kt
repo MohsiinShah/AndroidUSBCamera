@@ -16,23 +16,42 @@
 package com.jiangdg.demo
 
 import android.Manifest.permission.*
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.os.PowerManager
 import android.provider.Settings
+import android.text.InputFilter
+import android.text.InputType
 import android.util.Log
+import android.view.inputmethod.InputMethodManager
+import android.widget.EditText
 import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.PermissionChecker
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
+import androidx.work.Constraints
+import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import com.jiangdg.ApiViewModel
 import com.jiangdg.ausbc.utils.ToastUtils
 import com.jiangdg.ausbc.utils.Utils
 import com.jiangdg.demo.databinding.ActivityMainBinding
+import com.jiangdg.utils.Constants
+import com.jiangdg.utils.DatastoreManager
+import com.jiangdg.worker.DailyAdSyncWorker
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 import kotlin.system.exitProcess
 
 /**
@@ -47,12 +66,69 @@ class MainActivity : AppCompatActivity() {
 
     private val viewModel: ApiViewModel by viewModels()
 
+    @Inject
+    lateinit var dataStore: DatastoreManager
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         viewBinding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(viewBinding.root)
-        checkPermissionsAndMove()
+
+        lifecycleScope.launch {
+            val deviceID = dataStore.getData(Constants.USER_DEVICE_ID, -1).first()
+            if(deviceID == -1){
+                showDeviceIDInputDialog(this@MainActivity) { result ->
+                    if (result != null) {
+                        lifecycleScope.launch {
+                            dataStore.saveData(Constants.USER_DEVICE_ID, result)
+                            checkPermissionsAndMove()
+                        }
+                    } else{
+                        ToastUtils.show("Device ID is mandatory")
+                    }
+                }
+            }else {
+                checkPermissionsAndMove()
+            }
+        }
+
+    }
+
+    fun showDeviceIDInputDialog(
+        ctx: Context,
+        title: String = "Enter Device ID",
+        hint: String = "",
+        maxDigits: Int? = 6,
+        onResult: (Int?) -> Unit
+    ) {
+        val editText = EditText(ctx).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER // only digits
+            this.hint = hint
+            maxDigits?.let { filters = arrayOf(InputFilter.LengthFilter(it)) }
+            isSingleLine = true
+            setSelectAllOnFocus(true)
+        }
+
+        val dialog = AlertDialog.Builder(ctx)
+            .setTitle(title)
+            .setView(editText)
+            .setCancelable(false)
+            .setPositiveButton("Done") { d, _ ->
+                val raw = editText.text?.toString()?.trim().orEmpty()
+                val value = raw.takeIf { it.isNotEmpty() }?.toIntOrNull()
+                onResult(value) // null if not a valid integer
+                d.dismiss()
+            }
+            .create()
+
+        dialog.setOnShowListener {
+            editText.requestFocus()
+            val imm = ctx.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT)
+        }
+
+        dialog.show()
     }
 
     override fun onStart() {
@@ -69,6 +145,24 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun checkPermissionsAndMove() {
+
+        val request = OneTimeWorkRequestBuilder<DailyAdSyncWorker>()
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED) // needs internet
+                    .build()
+            )
+            .build()
+
+        WorkManager.getInstance(this)
+            .enqueueUniqueWork(
+                "DailyAdSyncWork",
+                ExistingWorkPolicy.KEEP, // don’t replace if already enqueued
+                request
+            )
+
+
+
         Log.d("TAG", "replaceDemoFragment: here")
         val hasCameraPermission = PermissionChecker.checkSelfPermission(this, CAMERA) == PermissionChecker.PERMISSION_GRANTED
         val hasAudioPermission = PermissionChecker.checkSelfPermission(this, RECORD_AUDIO) == PermissionChecker.PERMISSION_GRANTED

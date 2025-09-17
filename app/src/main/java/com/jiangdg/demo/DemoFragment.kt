@@ -48,6 +48,11 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.children
 import androidx.core.widget.TextViewCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.work.Constraints
+import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import com.afollestad.materialdialogs.MaterialDialog
 import com.afollestad.materialdialogs.list.listItemsSingleChoice
 import com.bumptech.glide.Glide
@@ -78,6 +83,8 @@ import com.jiangdg.utils.imageloader.ImageLoaders
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
+import com.jiangdg.db.displayedAdIds
+import com.jiangdg.worker.DailyAdSyncWorker
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -86,6 +93,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Duration
+import java.time.LocalDate
 import java.time.ZonedDateTime
 import java.util.*
 import javax.inject.Inject
@@ -220,39 +228,68 @@ class DemoFragment : CameraFragment(), View.OnClickListener, CaptureMediaView.On
             appDatabase.adDao().observeAllAds().collect { ads ->
                 if (ads.isEmpty()) return@collect
 
-                while (isActive) {
-                    val now = ZonedDateTime.now()
-                    val nextSlot = now.withSecond(0).withNano(0)
-                        .plusMinutes((5 - now.minute % 5).toLong())
-                    Log.d(TAG, "Next slot: $nextSlot")
-                    val adForSlot = ads.firstOrNull { ad ->
-                        val slot = ad.slotDateTime()
-                        slot.withSecond(0).withNano(0) == nextSlot.withSecond(0).withNano(0)
+                val today = LocalDate.now()
+                val areAdsValid = ads.any { ad ->
+                    try {
+                        val zdt = ZonedDateTime.parse(ad.slotTime)
+                        zdt.toLocalDate() == today
+                    } catch (e: Exception) {
+                        false
                     }
-                    Log.d(TAG, "Ad for slot: $adForSlot")
+                }
 
-                    if (adForSlot != null) {
-                        val delayMs = Duration.between(now, nextSlot).toMillis()
-                        if (delayMs > 0) delay(delayMs)
-                        withContext(Dispatchers.Main) {
-                            currentAd = adForSlot.toModel()
-                            isLBannerActive = true
-                            showLBanner(currentAd!!)
-                            // Show Confirm button while L-banner is active
-                            mViewBinding.root.findViewById<Button>(mViewBinding.root.children.last().id).visibility = View.VISIBLE
+                if(!areAdsValid){
+                    val request = OneTimeWorkRequestBuilder<DailyAdSyncWorker>()
+                        .setConstraints(
+                            Constraints.Builder()
+                                .setRequiredNetworkType(NetworkType.CONNECTED) // needs internet
+                                .build()
+                        )
+                        .build()
+
+                    WorkManager.getInstance(requireContext())
+                        .enqueueUniqueWork(
+                            "DailyAdSyncWork",
+                            ExistingWorkPolicy.KEEP, // don’t replace if already enqueued
+                            request
+                        )
+                }else {
+                    while (isActive) {
+                        val now = ZonedDateTime.now()
+                        val nextSlot = now.withSecond(0).withNano(0)
+                            .plusMinutes((5 - now.minute % 5).toLong())
+                        Log.d(TAG, "Next slot: $nextSlot")
+                        val adForSlot = ads.firstOrNull { ad ->
+                            val slot = ad.slotDateTime()
+                            slot.withSecond(0).withNano(0) == nextSlot.withSecond(0).withNano(0)
                         }
-                        adForSlot.isDisplayed = true
-                        appDatabase.adDao().update(adForSlot)
-                        delay(10_000)
-                        withContext(Dispatchers.Main) {
-                            hideLBanner()
-                            isLBannerActive = false
-                            // Hide Confirm button when L-banner is hidden
-                            mViewBinding.root.findViewById<Button>(mViewBinding.root.children.last().id).visibility = View.GONE
+                        Log.d(TAG, "Ad for slot: $adForSlot")
+
+                        if (adForSlot != null) {
+                            val delayMs = Duration.between(now, nextSlot).toMillis()
+                              if (delayMs > 0) delay(delayMs)
+                            withContext(Dispatchers.Main) {
+                                currentAd = adForSlot.toModel()
+                                isLBannerActive = true
+                                showLBanner(currentAd!!)
+                                // Show Confirm button while L-banner is active
+                                mViewBinding.root.findViewById<Button>(mViewBinding.root.children.last().id).visibility =
+                                    View.VISIBLE
+                            }
+                            adForSlot.isDisplayed = true
+                            appDatabase.adDao().update(adForSlot)
+                            delay(10_000)
+                            withContext(Dispatchers.Main) {
+                                hideLBanner()
+                                isLBannerActive = false
+                                // Hide Confirm button when L-banner is hidden
+                                mViewBinding.root.findViewById<Button>(mViewBinding.root.children.last().id).visibility =
+                                    View.GONE
+                            }
+                        } else {
+                            val delayMs = Duration.between(now, nextSlot).toMillis()
+                            if (delayMs > 0) delay(delayMs)
                         }
-                    } else {
-                        val delayMs = Duration.between(now, nextSlot).toMillis()
-                        if (delayMs > 0) delay(delayMs)
                     }
                 }
             }

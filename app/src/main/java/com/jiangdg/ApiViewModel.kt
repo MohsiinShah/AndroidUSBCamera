@@ -21,7 +21,7 @@ class ApiViewModel @Inject constructor(
     fun fetchData() {
         viewModelScope.launch {
             try {
-                _data.value = repository.getData()
+//                _data.value = repository.getData()
             } catch (e: Exception) {
                 // handle error
             }

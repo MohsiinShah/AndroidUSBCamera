@@ -59,3 +59,11 @@ fun AdEntity.toModel(): Ad = Ad(
 )
 
 fun AdEntity.slotDateTime(): ZonedDateTime = ZonedDateTime.parse(slotTime)
+
+/**
+ * Returns the list of ad IDs that have been displayed.
+ */
+fun List<AdEntity>.displayedAdIds(): List<String> =
+    filter { it.isDisplayed }
+        .mapNotNull { it.id }
+

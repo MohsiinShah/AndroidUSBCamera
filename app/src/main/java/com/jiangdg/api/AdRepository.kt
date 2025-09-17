@@ -4,6 +4,9 @@ import com.jiangdg.db.AdDao
 import com.jiangdg.db.AdEntity
 import com.jiangdg.db.toEntity
 import com.jiangdg.models.Ad
+import com.jiangdg.models.DeviceIdBody
+import com.jiangdg.models.GetAdsRequest
+import com.jiangdg.utils.DatastoreManager
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -14,11 +17,12 @@ import javax.inject.Inject
 
 class AdRepository @Inject constructor(
     private val api: ApiRepository,
+    private val dataStore: DatastoreManager,
     private val dao: AdDao
 ) {
 
-    suspend fun pullDailyAds() {
-        val ads = api.getData() // List<Ad>
+    suspend fun pullDailyAds(request: GetAdsRequest) {
+        val ads = api.getData(request) // List<Ad>
         val now = ZonedDateTime.now()
 
         // Round "now" up to the next 5-minute slot
@@ -32,7 +36,7 @@ class AdRepository @Inject constructor(
             val newSlot = baseSlot.plusMinutes((index * 5).toLong())
 
             ad.copy(
-                slotTime = newSlot.toString(),
+             //   slotTime = newSlot.toString(),
                 // Remove any trailing digits after .png
                 urlLeft = ad.urlLeft?.replace(Regex("(\\.png)\\d*$"), "$1"),
                 urlBottom = ad.urlBottom?.replace(Regex("(\\.png)\\d*$"), "$1"),

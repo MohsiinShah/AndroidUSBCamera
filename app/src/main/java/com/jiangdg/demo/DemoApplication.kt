@@ -27,10 +27,14 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.jiangdg.ausbc.base.BaseApplication
+import com.jiangdg.utils.Constants
+import com.jiangdg.utils.DatastoreManager
 import com.jiangdg.utils.MMKVUtils
 import com.jiangdg.worker.DailyAdSyncWorker
 import com.tencent.bugly.crashreport.CrashReport
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
@@ -44,6 +48,9 @@ class DemoApplication: BaseApplication(), Configuration.Provider  {
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
 
+    @Inject
+    lateinit var datastoreManager: DatastoreManager
+
     override fun attachBaseContext(base: Context?) {
         super.attachBaseContext(base)
     }
@@ -54,20 +61,26 @@ class DemoApplication: BaseApplication(), Configuration.Provider  {
         CrashReport.initCrashReport(this, "9baa0e3fac", true)
         MMKVUtils.init(this)
 
-        val request = OneTimeWorkRequestBuilder<DailyAdSyncWorker>()
-            .setConstraints(
-                Constraints.Builder()
-                    .setRequiredNetworkType(NetworkType.CONNECTED) // needs internet
-                    .build()
-            )
-            .build()
-
-        WorkManager.getInstance(this)
-            .enqueueUniqueWork(
-                "DailyAdSyncWork",
-                ExistingWorkPolicy.KEEP, // don’t replace if already enqueued
-                request
-            )
+//        runBlocking {
+//            val deviceID = datastoreManager.getData(Constants.USER_DEVICE_ID, -1).first()
+//
+//            if (deviceID != -1) {
+//                val request = OneTimeWorkRequestBuilder<DailyAdSyncWorker>()
+//                    .setConstraints(
+//                        Constraints.Builder()
+//                            .setRequiredNetworkType(NetworkType.CONNECTED) // needs internet
+//                            .build()
+//                    )
+//                    .build()
+//
+//                WorkManager.getInstance(this@DemoApplication)
+//                    .enqueueUniqueWork(
+//                        "DailyAdSyncWork",
+//                        ExistingWorkPolicy.KEEP, // don’t replace if already enqueued
+//                        request
+//                    )
+//            }
+//        }
     }
 
     override val workManagerConfiguration: Configuration
