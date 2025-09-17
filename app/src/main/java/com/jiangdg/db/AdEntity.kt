@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverters
 import com.jiangdg.models.Ad
+import java.time.ZoneOffset
 import java.time.ZonedDateTime
 
 @Entity(tableName = "ads")
@@ -58,7 +59,11 @@ fun AdEntity.toModel(): Ad = Ad(
     userId = userId
 )
 
-fun AdEntity.slotDateTime(): ZonedDateTime = ZonedDateTime.parse(slotTime)
+//fun AdEntity.slotDateTime(): ZonedDateTime = ZonedDateTime.parse(slotTime)
+
+fun AdEntity.slotDateTime(): ZonedDateTime =
+    ZonedDateTime.parse(slotTime).withZoneSameInstant(ZoneOffset.UTC)
+
 
 /**
  * Returns the list of ad IDs that have been displayed.

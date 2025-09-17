@@ -94,6 +94,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Duration
 import java.time.LocalDate
+import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.util.*
 import javax.inject.Inject
@@ -228,15 +229,26 @@ class DemoFragment : CameraFragment(), View.OnClickListener, CaptureMediaView.On
             appDatabase.adDao().observeAllAds().collect { ads ->
                 if (ads.isEmpty()) return@collect
 
-                val today = LocalDate.now()
+//                val today = LocalDate.now()
+//                val areAdsValid = ads.any { ad ->
+//                    try {
+//                        val zdt = ZonedDateTime.parse(ad.slotTime)
+//                        zdt.toLocalDate() == today
+//                    } catch (e: Exception) {
+//                        false
+//                    }
+//                }
+
+                val todayUtc = LocalDate.now(ZoneOffset.UTC)
                 val areAdsValid = ads.any { ad ->
                     try {
-                        val zdt = ZonedDateTime.parse(ad.slotTime)
-                        zdt.toLocalDate() == today
+                        val zdt = ZonedDateTime.parse(ad.slotTime).withZoneSameInstant(ZoneOffset.UTC)
+                        zdt.toLocalDate() == todayUtc
                     } catch (e: Exception) {
                         false
                     }
                 }
+
 
                 if(!areAdsValid){
                     val request = OneTimeWorkRequestBuilder<DailyAdSyncWorker>()
@@ -255,7 +267,7 @@ class DemoFragment : CameraFragment(), View.OnClickListener, CaptureMediaView.On
                         )
                 }else {
                     while (isActive) {
-                        val now = ZonedDateTime.now()
+                        val now = ZonedDateTime.now(ZoneOffset.UTC)
                         val nextSlot = now.withSecond(0).withNano(0)
                             .plusMinutes((5 - now.minute % 5).toLong())
                         Log.d(TAG, "Next slot: $nextSlot")
@@ -266,8 +278,9 @@ class DemoFragment : CameraFragment(), View.OnClickListener, CaptureMediaView.On
                         Log.d(TAG, "Ad for slot: $adForSlot")
 
                         if (adForSlot != null) {
+                            Log.d(TAG, "Ad will appear: $adForSlot")
                             val delayMs = Duration.between(now, nextSlot).toMillis()
-                              if (delayMs > 0) delay(delayMs)
+                            if (delayMs > 0) delay(delayMs)
                             withContext(Dispatchers.Main) {
                                 currentAd = adForSlot.toModel()
                                 isLBannerActive = true

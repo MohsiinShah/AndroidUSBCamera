@@ -19,6 +19,7 @@ import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.first
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.collections.map
@@ -93,17 +94,18 @@ class DailyAdSyncWorker @AssistedInject constructor(
     }
 
     suspend fun hasAdsForToday(): Boolean {
-        val today = LocalDate.now()
+        val todayUtc = LocalDate.now(ZoneOffset.UTC)
         val ads = appDatabase.adDao().getAllAds()
         return ads.any { ad ->
             try {
-                val zdt = ZonedDateTime.parse(ad.slotTime) // parses "2025-09-16T10:40+05:00[Asia/Karachi]"
-                zdt.toLocalDate() == today
+                val zdt = ZonedDateTime.parse(ad.slotTime).withZoneSameInstant(ZoneOffset.UTC)
+                zdt.toLocalDate() == todayUtc
             } catch (e: Exception) {
                 false
             }
         }
     }
+
 
 
 }
